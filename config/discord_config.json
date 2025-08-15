@@ -1,0 +1,7 @@
+{
+  "channel_id": "1405364114729074789",
+  "bot_token": "YOUR_BOT_TOKEN_HERE",
+  "guild_id": "YOUR_GUILD_ID_HERE",
+  "notification_message": "🟢 **{username}** joined **{guild_name}**",
+  "rate_limit_ms": 2000
+}

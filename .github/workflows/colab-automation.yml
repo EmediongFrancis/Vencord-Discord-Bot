@@ -1,0 +1,46 @@
+name: Vencord Discord Bot Automation
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # Every 4 hours
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [ main ]
+
+jobs:
+  setup-colab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          
+      - name: Run Colab Setup
+        run: |
+          python scripts/colab_setup.py
+        env:
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          
+      - name: Keep Colab Alive
+        run: |
+          python scripts/colab_keepalive.py
+        env:
+          COLAB_URL: ${{ secrets.COLAB_URL }}
+          
+      - name: Notify Success
+        if: success()
+        run: |
+          echo "Colab session refreshed successfully at $(date)"
+          
+      - name: Notify Failure
+        if: failure()
+        run: |
+          echo "Colab automation failed at $(date)"

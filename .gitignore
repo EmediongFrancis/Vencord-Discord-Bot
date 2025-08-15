@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Colab
+colab_url.txt
+*.ipynb
+
+# Discord
+discord.deb
+Vencord/
+
+# Logs
+*.log
+
+# Environment variables
+.env
