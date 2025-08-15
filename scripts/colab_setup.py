@@ -1,272 +1,86 @@
 #!/usr/bin/env python3
 """
-Automated Colab Setup for Vencord Discord Bot
-This script automatically sets up a Colab environment with Discord + Vencord
+Colab API-based Setup for Vencord Discord Bot
+Uses Colab's REST API instead of browser automation
 """
 
 import os
 import time
 import json
+import requests
 import subprocess
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
+from urllib.parse import urlparse, parse_qs
 
-class ColabAutomation:
+class ColabAPIAutomation:
     def __init__(self):
-        self.driver = None
+        self.session = requests.Session()
         self.colab_url = None
-
-    def cleanup_chrome_processes(self):
-        """Kill any existing Chrome processes"""
-        try:
-            print("🧹 Cleaning up existing Chrome processes...")
-            
-            # More aggressive cleanup
-            cleanup_commands = [
-                ["pkill", "-f", "chrome"],
-                ["pkill", "-f", "chromedriver"],
-                ["pkill", "-f", "google-chrome"],
-                ["pkill", "-f", "chromium"],
-                ["pkill", "-f", "chromium-browser"],
-                ["sudo", "pkill", "-9", "-f", "chrome"],
-                ["sudo", "pkill", "-9", "-f", "chromedriver"],
-                ["sudo", "pkill", "-9", "-f", "google-chrome"],
-                ["sudo", "pkill", "-9", "-f", "chromium"],
-                ["sudo", "pkill", "-9", "-f", "chromium-browser"]
-            ]
-            
-            for cmd in cleanup_commands:
-                try:
-                    subprocess.run(cmd, check=False)
-                except:
-                    pass
-            
-            # Remove ALL Chrome-related directories
-            cleanup_dirs = [
-                "/tmp/.com.google.Chrome*",
-                "/tmp/chrome*",
-                "/tmp/.org.chromium.Chromium*",
-                "/tmp/.config/chrome*",
-                "/tmp/.config/chromium*",
-                "/tmp/.cache/chrome*",
-                "/tmp/.cache/chromium*"
-            ]
-            
-            for dir_pattern in cleanup_dirs:
-                try:
-                    subprocess.run(["rm", "-rf"] + [dir_pattern], check=False)
-                except:
-                    pass
-            
-            # Wait longer for processes to fully terminate
-            time.sleep(5)
-            
-            print("✅ Chrome cleanup completed")
-            return True
-            
-        except Exception as e:
-            print(f"⚠️ Cleanup warning: {e}")
-            return True
-
-    def setup_driver(self):
-        """Set up a minimal browser driver without user data directory"""
-        try:
-            print(" Setting up minimal browser driver...")
-            
-            # Try to install a minimal browser
-            subprocess.run(["sudo", "apt-get", "update"], check=True)
-            
-            # Try different browser options
-            browsers_to_try = [
-                ["sudo", "apt-get", "install", "-y", "chromium-browser"],
-                ["sudo", "apt-get", "install", "-y", "chromium"],
-                ["sudo", "apt-get", "install", "-y", "google-chrome-stable"]
-            ]
-            
-            browser_installed = False
-            for browser_cmd in browsers_to_try:
-                try:
-                    print(f" Trying to install: {' '.join(browser_cmd)}")
-                    subprocess.run(browser_cmd, check=True)
-                    browser_installed = True
-                    print("✅ Browser installed successfully")
-                    break
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠️ Failed to install: {e}")
-                    continue
-            
-            if not browser_installed:
-                print("❌ Could not install any browser")
-                return False
-            
-            # Try to use the system's default Chrome/Chromium with minimal options
-            try:
-                from selenium.webdriver.chrome.options import Options
-                chrome_options = Options()
-                chrome_options.add_argument("--no-sandbox")
-                chrome_options.add_argument("--disable-dev-shm-usage")
-                chrome_options.add_argument("--disable-gpu")
-                chrome_options.add_argument("--disable-extensions")
-                chrome_options.add_argument("--disable-plugins")
-                chrome_options.add_argument("--disable-background-timer-throttling")
-                chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-                chrome_options.add_argument("--disable-renderer-backgrounding")
-                chrome_options.add_argument("--disable-features=TranslateUI")
-                chrome_options.add_argument("--disable-ipc-flooding-protection")
-                
-                # NO user-data-dir argument at all
-                
-                print("📁 Using default Chrome settings (no custom user data directory)")
-                
-                # Try to find ChromeDriver in system PATH
-                self.driver = webdriver.Chrome(options=chrome_options)
-                print("✅ Chrome driver created successfully")
-                return True
-                
-            except Exception as chrome_error:
-                print(f"⚠️ Chrome failed: {chrome_error}")
-                
-                # Fallback: try to use system's default browser
-                try:
-                    print("🔄 Trying system default browser...")
-                    self.driver = webdriver.Chrome()  # No options, let system decide
-                    print("✅ System default browser driver created")
-                    return True
-                except Exception as fallback_error:
-                    print(f"❌ System default also failed: {fallback_error}")
-                    return False
-            
-        except Exception as e:
-            print(f"❌ Error setting up browser driver: {e}")
-            return False
+        self.notebook_id = None
         
-    def create_colab_notebook(self):
-        """Create a new Colab notebook with manual sign-in support"""
+    def setup_colab_api(self):
+        """Set up Colab API session"""
         try:
-            # Go to Colab
-            self.driver.get("https://colab.research.google.com/")
-            time.sleep(5)
+            print("🔧 Setting up Colab API...")
             
-            # Check if signed in
-            try:
-                # Look for sign-in button
-                sign_in_btn = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Sign in')]")
-                if sign_in_btn:
-                    print("=" * 60)
-                    print("🔐 MANUAL SIGN-IN REQUIRED")
-                    print("=" * 60)
-                    print("Please sign in to your Google account in the browser window.")
-                    print("The automation will wait for you to complete sign-in.")
-                    print("=" * 60)
-                    
-                    # Wait for user to sign in manually
-                    while True:
-                        try:
-                            # Check if we're now signed in by looking for user avatar or notebook creation options
-                            signed_in_indicators = [
-                                "//*[contains(text(), 'NEW NOTEBOOK')]",
-                                "//*[contains(text(), 'File')]",
-                                "//*[contains(text(), 'Runtime')]",
-                                "//*[contains(text(), 'Tools')]"
-                            ]
-                            
-                            signed_in = False
-                            for indicator in signed_in_indicators:
-                                if self.driver.find_elements(By.XPATH, indicator):
-                                    signed_in = True
-                                    break
-                            
-                            if signed_in:
-                                print("✅ Sign-in detected! Proceeding with automation...")
-                                break
-                            
-                            # Also check if sign-in button is gone
-                            if not self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Sign in')]"):
-                                print("✅ Sign-in button disappeared, proceeding...")
-                                break
-                            
-                            print("⏳ Waiting for sign-in... (check browser window)")
-                            time.sleep(10)
-                            
-                        except Exception as e:
-                            print(f"⏳ Still waiting for sign-in... ({e})")
-                            time.sleep(10)
-                    
-                    # Give extra time for page to fully load after sign-in
-                    print("�� Page loading after sign-in...")
-                    time.sleep(10)
-                    
-            except:
-                print("✅ Already signed in or sign-in not required")
+            # Install required packages
+            subprocess.run(["pip", "install", "google-colab", "google-auth", "google-auth-oauthlib"], check=True)
             
-            # Now create new notebook via File menu
-            print("📝 Creating new notebook...")
-            try:
-                # Try File menu approach first
-                file_menu = WebDriverWait(self.driver, 15).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'File')]"))
-                )
-                print("📁 Found File menu, clicking...")
-                file_menu.click()
-                time.sleep(3)
-                
-                # Look for "New notebook" option
-                new_notebook_option = WebDriverWait(self.driver, 15).until(
-                    EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'New notebook')]"))
-                )
-                print("�� Found New notebook option, clicking...")
-                new_notebook_option.click()
-                time.sleep(15)
-                
-            except Exception as e:
-                print(f"⚠️ File menu approach failed: {e}")
-                print("�� Trying alternative method...")
-                
-                # Alternative: try direct new notebook URL
-                try:
-                    self.driver.get("https://colab.research.google.com/notebooks/create")
-                    time.sleep(15)
-                    print("✅ Used direct URL method")
-                except Exception as fallback_error:
-                    print(f"❌ Fallback also failed: {fallback_error}")
-                    return False
+            # Set up Google authentication
+            from google.colab import auth
+            from google.auth import default
             
-            # Wait for code cells to appear
-            print("🔍 Waiting for code cells to load...")
-            try:
-                WebDriverWait(self.driver, 45).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.codecell-input"))
-                )
-                print("✅ Code cells found - new notebook created successfully!")
-            except Exception as e:
-                print(f"❌ No code cells found: {e}")
-                return False
+            print("🔐 Authenticating with Google...")
+            auth.authenticate_user()
             
-            # Get the new notebook URL
-            self.colab_url = self.driver.current_url
-            print(f"🔗 New notebook URL: {self.colab_url}")
+            # Get credentials
+            creds, project = default()
+            print("✅ Google authentication successful")
             
             return True
             
         except Exception as e:
-            print(f"❌ Error creating notebook: {e}")
+            print(f"❌ API setup failed: {e}")
             return False
-            
-    def install_discord_vencord(self):
-        """Install Discord and Vencord in Colab"""
+    
+    def create_notebook_via_api(self):
+        """Create a new notebook using Colab API"""
         try:
-            # Wait for code cell to be ready
-            code_cell = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.codecell-input"))
-            )
+            print("📝 Creating new notebook via API...")
             
-            # Install Discord and Vencord
-            install_script = '''
-# Install Discord desktop
+            # Use Colab's notebook creation endpoint
+            create_url = "https://colab.research.google.com/api/notebooks/create"
+            
+            # Set up headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+            
+            # Create notebook
+            response = self.session.post(create_url, headers=headers)
+            
+            if response.status_code == 200:
+                notebook_data = response.json()
+                self.notebook_id = notebook_data.get('notebook_id')
+                self.colab_url = f"https://colab.research.google.com/drive/{self.notebook_id}"
+                print(f"✅ Notebook created: {self.colab_url}")
+                return True
+            else:
+                print(f"❌ Failed to create notebook: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ API notebook creation failed: {e}")
+            return False
+    
+    def install_discord_vencord(self):
+        """Install Discord and Vencord using Colab API"""
+        try:
+            print("�� Installing Discord and Vencord...")
+            
+            # Prepare installation code
+            install_code = '''# Install Discord desktop
 !wget -O discord.deb "https://discord.com/api/downloads/distro/app/linux/x64/stable"
 !dpkg -i discord.deb
 !apt install -f -y
@@ -282,42 +96,50 @@ class ColabAutomation:
 !npm install
 !npm run build
 
-print("Discord and Vencord installed successfully!")
-'''
+print("Discord and Vencord installed successfully!")'''
             
-            # Execute the installation
-            self.driver.execute_script(f"""
-                var cell = document.querySelector('.codecell-input');
-                var textarea = cell.querySelector('textarea');
-                textarea.value = `{install_script}`;
-                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            """)
+            # Execute code via API
+            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
             
-            # Run the cell
-            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
-            run_btn.click()
+            payload = {
+                "code": install_code,
+                "cell_id": "install_cell"
+            }
             
-            # Wait for installation to complete
-            time.sleep(120)  # 2 minutes for installation
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
             
-            print("Discord and Vencord installation completed")
-            return True
+            response = self.session.post(execute_url, json=payload, headers=headers)
             
+            if response.status_code == 200:
+                print("✅ Installation code executed")
+                # Wait for installation to complete
+                time.sleep(120)
+                return True
+            else:
+                print(f"❌ Installation failed: {response.status_code}")
+                return False
+                
         except Exception as e:
-            print(f"Error during installation: {e}")
+            print(f"❌ Installation failed: {e}")
             return False
-            
+    
     def setup_plugin(self):
         """Set up the notifyServerJoins plugin"""
         try:
-            # Create plugin directory and file
-            plugin_script = '''# Create plugin directory
+            print("🔌 Setting up plugin...")
+            
+            # Plugin setup code
+            plugin_code = '''# Create plugin directory
 !mkdir -p src/userplugins/notifyServerJoins
 
 # Create the plugin file
 plugin_code = """/*
  * Vencord, a Discord client mod
- * Copyright (c) 2025 Emediong Francis
+ * Copyright (c) 2025 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -391,99 +213,100 @@ export default definePlugin({
 with open('src/userplugins/notifyServerJoins/index.ts', 'w') as f:
     f.write(plugin_code)
 
-print("Plugin file created successfully!")
-'''
+print("Plugin file created successfully!")'''
             
             # Execute plugin setup
-            self.driver.execute_script(f"""
-                var cell = document.querySelector('.codecell-input');
-                var textarea = cell.querySelector('textarea');
-                textarea.value = `{plugin_script}`;
-                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            """)
+            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
             
-            # Run the cell
-            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
-            run_btn.click()
+            payload = {
+                "code": plugin_code,
+                "cell_id": "plugin_cell"
+            }
             
-            time.sleep(30)
-            print("Plugin setup completed")
-            return True
+            response = self.session.post(execute_url, json=payload, headers=headers)
             
+            if response.status_code == 200:
+                print("✅ Plugin setup completed")
+                time.sleep(30)
+                return True
+            else:
+                print(f"❌ Plugin setup failed: {response.status_code}")
+                return False
+                
         except Exception as e:
-            print(f"Error setting up plugin: {e}")
+            print(f"❌ Plugin setup failed: {e}")
             return False
-            
+    
     def start_discord(self):
-        """Start Discord in Colab"""
+        """Start Discord"""
         try:
-            start_script = '''
-# Start Discord
+            print("🚀 Starting Discord...")
+            
+            start_code = '''# Start Discord
 !discord &
-print("Discord started successfully!")
-'''
+print("Discord started successfully!")'''
             
-            # Execute start script
-            self.driver.execute_script(f"""
-                var cell = document.querySelector('.codecell-input');
-                var textarea = cell.querySelector('textarea');
-                textarea.value = `{start_script}`;
-                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            """)
+            # Execute start code
+            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
             
-            # Run the cell
-            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
-            run_btn.click()
+            payload = {
+                "code": start_code,
+                "cell_id": "start_cell"
+            }
             
-            time.sleep(30)
-            print("Discord started successfully")
-            return True
+            response = self.session.post(execute_url, json=payload, headers=headers)
             
+            if response.status_code == 200:
+                print("✅ Discord started")
+                time.sleep(30)
+                return True
+            else:
+                print(f"❌ Discord start failed: {response.status_code}")
+                return False
+                
         except Exception as e:
-            print(f"Error starting Discord: {e}")
+            print(f"❌ Discord start failed: {e}")
             return False
-            
+    
     def run(self):
         """Main execution flow"""
         try:
-            print("Starting Colab automation...")
+            print("�� Starting Colab API automation...")
             
-            # Setup Chrome driver
-            self.setup_driver();
+            # Setup Colab API
+            if not self.setup_colab_api():
+                return False
             
             # Create notebook
-            if not self.create_colab_notebook():
+            if not self.create_notebook_via_api():
                 return False
-                
+            
             # Install Discord and Vencord
             if not self.install_discord_vencord():
                 return False
-                
+            
             # Setup plugin
             if not self.setup_plugin():
                 return False
-                
+            
             # Start Discord
             if not self.start_discord():
                 return False
-                
-            print(f"Setup completed successfully! Colab URL: {self.colab_url}")
             
-            # Save URL to file for GitHub Actions
+            print(f"🎉 Setup completed successfully!")
+            print(f"📓 Notebook URL: {self.colab_url}")
+            
+            # Save URL to file
             with open('colab_url.txt', 'w') as f:
                 f.write(self.colab_url)
-                
+            
             return True
             
         except Exception as e:
-            print(f"Automation failed: {e}")
+            print(f"❌ Automation failed: {e}")
             return False
-            
-        finally:
-            if self.driver:
-                self.driver.quit()
 
 if __name__ == "__main__":
-    automation = ColabAutomation()
+    automation = ColabAPIAutomation()
     success = automation.run()
     exit(0 if success else 1)
