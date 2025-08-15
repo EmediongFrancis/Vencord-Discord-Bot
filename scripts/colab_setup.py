@@ -20,60 +20,66 @@ class ColabAutomation:
         self.driver = None
         self.colab_url = None
 
-    def cleanup_chrome_processes(self):
-        """Kill any existing Chrome processes"""
-        try:
-            print("🧹 Cleaning up existing Chrome processes...")
-            
-            # Kill Chrome processes
-            subprocess.run(["pkill", "-f", "chrome"], check=False)
-            subprocess.run(["pkill", "-f", "chromedriver"], check=False)
-            subprocess.run(["pkill", "-f", "google-chrome"], check=False)
-            
-            # Force kill if needed
-            subprocess.run(["pkill", "-9", "-f", "chrome"], check=False)
-            subprocess.run(["pkill", "-9", "-f", "chromedriver"], check=False)
-            
-            # Remove Chrome user data directories
-            subprocess.run(["rm", "-rf", "/tmp/.com.google.Chrome*"], check=False)
-            subprocess.run(["rm", "-rf", "/tmp/chrome*"], check=False)
-            subprocess.run(["rm", "-rf", "/tmp/.org.chromium.Chromium*"], check=False)
-            
-            # Wait a moment for processes to fully terminate
-            time.sleep(3)
-            
-            print("✅ Chrome cleanup completed")
-            return True
-        
-        except Exception as e:
-            print(f"⚠️ Cleanup warning: {e}")
-            return True  # Continue even if cleanup has warnings
-        
     def setup_driver(self):
-        """Set up Firefox driver instead of Chrome to avoid conflicts"""
+        """Set up a minimal browser driver"""
         try:
-            print("�� Setting up Firefox driver...")
+            print("�� Setting up minimal browser driver...")
             
-            # Install Firefox
+            # Try to install a minimal browser
             subprocess.run(["sudo", "apt-get", "update"], check=True)
-            subprocess.run(["sudo", "apt-get", "install", "-y", "firefox", "firefox-geckodriver"], check=True)
             
-            # Set up Firefox options
-            from selenium.webdriver.firefox.options import Options as FirefoxOptions
-            firefox_options = FirefoxOptions()
-            firefox_options.add_argument("--no-sandbox")
-            firefox_options.add_argument("--disable-dev-shm-usage")
+            # Try different browser options
+            browsers_to_try = [
+                ["sudo", "apt-get", "install", "-y", "chromium-browser"],
+                ["sudo", "apt-get", "install", "-y", "chromium"],
+                ["sudo", "apt-get", "install", "-y", "google-chrome-stable"]
+            ]
             
-            # Create Firefox driver
-            from selenium.webdriver.firefox.service import Service as FirefoxService
-            service = FirefoxService()
-            self.driver = webdriver.Firefox(service=service, options=firefox_options)
+            browser_installed = False
+            for browser_cmd in browsers_to_try:
+                try:
+                    print(f"�� Trying to install: {' '.join(browser_cmd)}")
+                    subprocess.run(browser_cmd, check=True)
+                    browser_installed = True
+                    print("✅ Browser installed successfully")
+                    break
+                except subprocess.CalledProcessError as e:
+                    print(f"⚠️ Failed to install: {e}")
+                    continue
             
-            print("✅ Firefox driver setup completed successfully")
-            return True
+            if not browser_installed:
+                print("❌ Could not install any browser")
+                return False
+            
+            # Try to use the system's default Chrome/Chromium
+            try:
+                from selenium.webdriver.chrome.options import Options
+                chrome_options = Options()
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                chrome_options.add_argument("--disable-gpu")
+                chrome_options.add_argument("--headless")
+                
+                # Try to find ChromeDriver in system PATH
+                self.driver = webdriver.Chrome(options=chrome_options)
+                print("✅ Chrome driver created successfully")
+                return True
+                
+            except Exception as chrome_error:
+                print(f"⚠️ Chrome failed: {chrome_error}")
+                
+                # Fallback: try to use system's default browser
+                try:
+                    print("🔄 Trying system default browser...")
+                    self.driver = webdriver.Chrome()  # No options, let system decide
+                    print("✅ System default browser driver created")
+                    return True
+                except Exception as fallback_error:
+                    print(f"❌ System default also failed: {fallback_error}")
+                    return False
             
         except Exception as e:
-            print(f"❌ Error setting up Firefox driver: {e}")
+            print(f"❌ Error setting up browser driver: {e}")
             return False
         
     def create_colab_notebook(self):
