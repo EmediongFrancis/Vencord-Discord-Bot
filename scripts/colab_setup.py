@@ -67,19 +67,36 @@ class ColabAutomation:
             # Go to Colab
             self.driver.get("https://colab.research.google.com/")
             
-            # Wait for page to load
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "body"))
-            )
+            # Wait longer for page to load and add more robust element detection
+            time.sleep(10)
             
-            # Create new notebook
-            new_notebook_btn = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'NEW NOTEBOOK')]"))
-            )
-            new_notebook_btn.click()
+            # Try multiple selectors for the new notebook button
+            selectors = [
+                "//span[contains(text(), 'NEW NOTEBOOK')]",
+                "//span[contains(text(), 'New notebook')]",
+                "//div[contains(text(), 'NEW NOTEBOOK')]",
+                "//div[contains(text(), 'New notebook')]",
+                "//button[contains(text(), 'NEW NOTEBOOK')]",
+                "//button[contains(text(), 'New notebook')]"
+            ]
             
-            # Wait for notebook to load
-            time.sleep(5)
+            new_notebook_btn = None
+            for selector in selectors:
+                try:
+                    new_notebook_btn = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, selector))
+                    )
+                    break
+                except:
+                    continue
+            
+            if not new_notebook_btn:
+                # If no button found, try to create notebook via URL
+                self.driver.get("https://colab.research.google.com/notebook/create")
+                time.sleep(5)
+            else:
+                new_notebook_btn.click()
+                time.sleep(5)
             
             # Get the notebook URL
             self.colab_url = self.driver.current_url
@@ -89,7 +106,16 @@ class ColabAutomation:
             
         except Exception as e:
             print(f"Error creating notebook: {e}")
-            return False
+            # Try direct notebook creation as fallback
+            try:
+                self.driver.get("https://colab.research.google.com/notebook/create")
+                time.sleep(5)
+                self.colab_url = self.driver.current_url
+                print(f"Created Colab notebook via direct URL: {self.colab_url}")
+                return True
+            except Exception as fallback_error:
+                print(f"Fallback also failed: {fallback_error}")
+                return False
             
     def install_discord_vencord(self):
         """Install Discord and Vencord in Colab"""
