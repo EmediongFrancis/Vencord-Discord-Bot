@@ -121,7 +121,7 @@ print("Discord and Vencord installed successfully!")
 !mkdir -p src/userplugins/notifyServerJoins
 
 # Create the plugin file
-plugin_code = '''/*
+plugin_code = """/*
  * Vencord, a Discord client mod
  * Copyright (c) 2025 Emediong Francis
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -192,7 +192,7 @@ export default definePlugin({
         console.log("Unsubscribing from GUILD_MEMBER_ADD event via FluxDispatcher.");
         FluxDispatcher.unsubscribe("GUILD_MEMBER_ADD", onMemberJoin);
     }
-});'''
+});"""
 
 with open('src/userplugins/notifyServerJoins/index.ts', 'w') as f:
     f.write(plugin_code)
