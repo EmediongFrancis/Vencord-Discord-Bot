@@ -7,6 +7,7 @@ This script automatically sets up a Colab environment with Discord + Vencord
 import os
 import time
 import json
+import subprocess
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -21,16 +22,44 @@ class ColabAutomation:
         self.colab_url = None
         
     def setup_driver(self):
-        """Set up Chrome driver with headless options"""
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        """Set up Chrome driver with proper path handling"""
+        try:
+            # Install Chrome and ChromeDriver manually
+            subprocess.run(["sudo", "apt-get", "update"], check=True)
+            subprocess.run(["sudo", "apt-get", "install", "-y", "wget", "unzip"], check=True)
+            
+            # Download and install Chrome
+            subprocess.run(["wget", "-q", "-O", "-", "https://dl.google.com/linux/linux_signing_key.pub"], 
+                        stdout=subprocess.PIPE, check=True)
+            subprocess.run(["sudo", "apt-get", "install", "-y", "google-chrome-stable"], check=True)
+            
+            # Download ChromeDriver
+            subprocess.run(["wget", "-O", "chromedriver.zip", 
+                        "https://chromedriver.storage.googleapis.com/139.0.7258.68/chromedriver_linux64.zip"], check=True)
+            subprocess.run(["unzip", "chromedriver.zip"], check=True)
+            subprocess.run(["chmod", "+x", "chromedriver"], check=True)
+            subprocess.run(["sudo", "mv", "chromedriver", "/usr/local/bin/"], check=True)
+            
+            # Set up Chrome options
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins")
+            
+            # Create service with explicit path
+            service = Service("/usr/local/bin/chromedriver")
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            print("Chrome driver setup completed successfully")
+            return True
+            
+        except Exception as e:
+            print(f"Error setting up Chrome driver: {e}")
+            return False
         
     def create_colab_notebook(self):
         """Create a new Colab notebook"""
