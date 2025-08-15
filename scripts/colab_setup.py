@@ -65,7 +65,7 @@ class ColabAutomation:
      """Create a new Colab notebook"""
      try:
             # Go to Colab
-            self.driver.get("https://colab.research.google.com/notebook/create")
+            self.driver.get("https://colab.research.google.com/")
             
             # Wait for the actual notebook to load (not just the create page)
             time.sleep(15)
@@ -79,7 +79,7 @@ class ColabAutomation:
             except:
                 # If no code cells found, try to navigate to a working notebook
                 print("No code cells found, trying to create working notebook...")
-                self.driver.get("https://colab.google//")
+                self.driver.get("https://colab.research.google.com/")
                 time.sleep(10)
                 
                 # Look for and click "NEW NOTEBOOK" button
