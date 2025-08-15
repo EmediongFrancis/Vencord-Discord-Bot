@@ -20,6 +20,35 @@ class ColabAutomation:
     def __init__(self):
         self.driver = None
         self.colab_url = None
+
+    def cleanup_chrome_processes(self):
+        """Kill any existing Chrome processes"""
+        try:
+            print("🧹 Cleaning up existing Chrome processes...")
+            
+            # Kill Chrome processes
+            subprocess.run(["pkill", "-f", "chrome"], check=False)
+            subprocess.run(["pkill", "-f", "chromedriver"], check=False)
+            subprocess.run(["pkill", "-f", "google-chrome"], check=False)
+            
+            # Force kill if needed
+            subprocess.run(["pkill", "-9", "-f", "chrome"], check=False)
+            subprocess.run(["pkill", "-9", "-f", "chromedriver"], check=False)
+            
+            # Remove Chrome user data directories
+            subprocess.run(["rm", "-rf", "/tmp/.com.google.Chrome*"], check=False)
+            subprocess.run(["rm", "-rf", "/tmp/chrome*"], check=False)
+            subprocess.run(["rm", "-rf", "/tmp/.org.chromium.Chromium*"], check=False)
+            
+            # Wait a moment for processes to fully terminate
+            time.sleep(3)
+            
+            print("✅ Chrome cleanup completed")
+            return True
+        
+        except Exception as e:
+            print(f"⚠️ Cleanup warning: {e}")
+            return True  # Continue even if cleanup has warnings
         
     def setup_driver(self):
         """Set up Chrome driver with manual sign-in support"""
@@ -364,9 +393,13 @@ print("Discord started successfully!")
         """Main execution flow"""
         try:
             print("Starting Colab automation...")
+
+            # Cleanup Chrome processes
+            self.cleanup_chrome_processes()
             
             # Setup Chrome driver
-            self.setup_driver()
+            if not self.setup_driver():
+                return False
             
             # Create notebook
             if not self.create_colab_notebook():
