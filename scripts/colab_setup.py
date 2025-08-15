@@ -12,9 +12,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
 
 class ColabAutomation:
     def __init__(self):
@@ -51,43 +50,30 @@ class ColabAutomation:
             return True  # Continue even if cleanup has warnings
         
     def setup_driver(self):
-        """Set up Chrome driver with manual sign-in support"""
+        """Set up Firefox driver instead of Chrome to avoid conflicts"""
         try:
-            # Install Chrome and ChromeDriver manually
+            print("�� Setting up Firefox driver...")
+            
+            # Install Firefox
             subprocess.run(["sudo", "apt-get", "update"], check=True)
-            subprocess.run(["sudo", "apt-get", "install", "-y", "wget", "unzip"], check=True)
+            subprocess.run(["sudo", "apt-get", "install", "-y", "firefox", "firefox-geckodriver"], check=True)
             
-            # Download and install Chrome
-            subprocess.run(["wget", "-q", "-O", "-", "https://dl.google.com/linux/linux_signing_key.pub"], 
-                        stdout=subprocess.PIPE, check=True)
-            subprocess.run(["sudo", "apt-get", "install", "-y", "google-chrome-stable"], check=True)
+            # Set up Firefox options
+            from selenium.webdriver.firefox.options import Options as FirefoxOptions
+            firefox_options = FirefoxOptions()
+            firefox_options.add_argument("--no-sandbox")
+            firefox_options.add_argument("--disable-dev-shm-usage")
             
-            # Download ChromeDriver
-            subprocess.run(["wget", "-O", "chromedriver.zip", 
-                        "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/139.0.7258.66/linux64/chromedriver-linux64.zip"], check=True)
-            subprocess.run(["unzip", "chromedriver.zip"], check=True)
-            subprocess.run(["chmod", "+x", "chromedriver-linux64/chromedriver"], check=True)
-            subprocess.run(["sudo", "mv", "chromedriver-linux64/chromedriver", "/usr/local/bin/"], check=True)
+            # Create Firefox driver
+            from selenium.webdriver.firefox.service import Service as FirefoxService
+            service = FirefoxService()
+            self.driver = webdriver.Firefox(service=service, options=firefox_options)
             
-            # Set up Chrome options - MINIMAL to avoid conflicts
-            chrome_options = Options()
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--allow-running-insecure-content")
-            
-            # Create service with explicit path..
-            service = Service("/usr/local/bin/chromedriver")
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            print("✅ Chrome driver setup completed successfully")
+            print("✅ Firefox driver setup completed successfully")
             return True
-        
+            
         except Exception as e:
-            print(f"❌ Error setting up Chrome driver: {e}")
+            print(f"❌ Error setting up Firefox driver: {e}")
             return False
         
     def create_colab_notebook(self):
