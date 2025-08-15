@@ -62,60 +62,57 @@ class ColabAutomation:
             return False
         
     def create_colab_notebook(self):
-        """Create a new Colab notebook"""
-        try:
+     """Create a new Colab notebook"""
+     try:
             # Go to Colab
-            self.driver.get("https://colab.research.google.com/")
+            self.driver.get("https://colab.research.google.com/notebook/create")
             
-            # Wait longer for page to load and add more robust element detection
-            time.sleep(10)
+            # Wait for the actual notebook to load (not just the create page)
+            time.sleep(15)
             
-            # Try multiple selectors for the new notebook button
-            selectors = [
-                "//span[contains(text(), 'NEW NOTEBOOK')]",
-                "//span[contains(text(), 'New notebook')]",
-                "//div[contains(text(), 'NEW NOTEBOOK')]",
-                "//div[contains(text(), 'New notebook')]",
-                "//button[contains(text(), 'NEW NOTEBOOK')]",
-                "//button[contains(text(), 'New notebook')]"
-            ]
-            
-            new_notebook_btn = None
-            for selector in selectors:
-                try:
-                    new_notebook_btn = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, selector))
-                    )
-                    break
-                except:
-                    continue
-            
-            if not new_notebook_btn:
-                # If no button found, try to create notebook via URL
-                self.driver.get("https://colab.research.google.com/notebook/create")
-                time.sleep(5)
-            else:
-                new_notebook_btn.click()
-                time.sleep(5)
-            
-            # Get the notebook URL
-            self.colab_url = self.driver.current_url
-            print(f"Created Colab notebook: {self.colab_url}")
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error creating notebook: {e}")
-            # Try direct notebook creation as fallback
+            # Check if we're in a real notebook by looking for code cells
             try:
-                self.driver.get("https://colab.research.google.com/notebook/create")
-                time.sleep(5)
-                self.colab_url = self.driver.current_url
-                print(f"Created Colab notebook via direct URL: {self.colab_url}")
-                return True
-            except Exception as fallback_error:
-                print(f"Fallback also failed: {fallback_error}")
+                WebDriverWait(self.driver, 20).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.codecell-input"))
+                )
+                print("Notebook loaded successfully with code cells")
+            except:
+                # If no code cells found, try to navigate to a working notebook
+                print("No code cells found, trying to create working notebook...")
+                self.driver.get("https://colab.research.google.com/")
+                time.sleep(10)
+                
+                # Look for and click "NEW NOTEBOOK" button
+                try:
+                    new_btn = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, "//*[contains(text(), 'NEW NOTEBOOK') or contains(text(), 'New notebook')]"))
+                    )
+                    new_btn.click()
+                    time.sleep(10)
+                except:
+                    print("Could not find NEW NOTEBOOK button")
+                    return False
+            
+            # Get the final notebook URL
+            self.colab_url = self.driver.current_url
+            print(f"Final Colab notebook URL: {self.colab_url}")
+            
+            # Verify we have a working notebook
+            try:
+                code_cells = self.driver.find_elements(By.CSS_SELECTOR, "div.codecell-input")
+                if code_cells:
+                    print(f"Found {len(code_cells)} code cells - notebook is ready")
+                    return True
+                else:
+                    print("No code cells found - notebook not ready")
+                    return False
+            except Exception as e:
+                print(f"Error verifying notebook: {e}")
                 return False
+            
+     except Exception as e:
+            print(f"Error creating notebook: {e}")
+            return False
             
     def install_discord_vencord(self):
         """Install Discord and Vencord in Colab"""
