@@ -35,7 +35,7 @@ class ColabAutomation:
             
             # Download ChromeDriver
             subprocess.run(["wget", "-O", "chromedriver.zip", 
-                        "https://chromedriver.storage.googleapis.com/139.0.7258.68/chromedriver_linux64.zip"], check=True)
+                        "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"], check=True)
             subprocess.run(["unzip", "chromedriver.zip"], check=True)
             subprocess.run(["chmod", "+x", "chromedriver"], check=True)
             subprocess.run(["sudo", "mv", "chromedriver", "/usr/local/bin/"], check=True)
