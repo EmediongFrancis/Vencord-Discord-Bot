@@ -385,13 +385,9 @@ print("Discord started successfully!")
         """Main execution flow"""
         try:
             print("Starting Colab automation...")
-
-            # Cleanup Chrome processes
-            self.cleanup_chrome_processes()
             
             # Setup Chrome driver
-            if not self.setup_driver():
-                return False
+            self.setup_driver();
             
             # Create notebook
             if not self.create_colab_notebook():
