@@ -40,16 +40,15 @@ class ColabAutomation:
             subprocess.run(["chmod", "+x", "chromedriver-linux64/chromedriver"], check=True)
             subprocess.run(["sudo", "mv", "chromedriver-linux64/chromedriver", "/usr/local/bin/"], check=True)
             
-            # Set up Chrome options with unique user data directory
+            # Set up Chrome options - MINIMAL to avoid conflicts
             chrome_options = Options()
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--disable-extensions")
             chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data-" + str(int(time.time())))
-            chrome_options.add_argument("--remote-debugging-port=9222")
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--allow-running-insecure-content")
             
             # Create service with explicit path
             service = Service("/usr/local/bin/chromedriver")
@@ -57,7 +56,7 @@ class ColabAutomation:
             
             print("✅ Chrome driver setup completed successfully")
             return True
-            
+        
         except Exception as e:
             print(f"❌ Error setting up Chrome driver: {e}")
             return False
