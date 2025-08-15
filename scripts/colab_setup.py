@@ -79,7 +79,7 @@ class ColabAutomation:
             except:
                 # If no code cells found, try to navigate to a working notebook
                 print("No code cells found, trying to create working notebook...")
-                self.driver.get("https://colab.research.google.com/")
+                self.driver.get("https://colab.google//")
                 time.sleep(10)
                 
                 # Look for and click "NEW NOTEBOOK" button
