@@ -22,7 +22,7 @@ class ColabAutomation:
         self.colab_url = None
         
     def setup_driver(self):
-        """Set up Chrome driver with proper path handling"""
+        """Set up Chrome driver with manual sign-in support"""
         try:
             # Install Chrome and ChromeDriver manually
             subprocess.run(["sudo", "apt-get", "update"], check=True)
@@ -40,25 +40,26 @@ class ColabAutomation:
             subprocess.run(["chmod", "+x", "chromedriver-linux64/chromedriver"], check=True)
             subprocess.run(["sudo", "mv", "chromedriver-linux64/chromedriver", "/usr/local/bin/"], check=True)
             
-            # Set up Chrome options
+            # Set up Chrome options with unique user data directory
             chrome_options = Options()
-           # chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--window-size=1920,1080")
             chrome_options.add_argument("--disable-extensions")
             chrome_options.add_argument("--disable-plugins")
+            chrome_options.add_argument("--user-data-dir=/tmp/chrome-user-data-" + str(int(time.time())))
+            chrome_options.add_argument("--remote-debugging-port=9222")
             
             # Create service with explicit path
             service = Service("/usr/local/bin/chromedriver")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             
-            print("Chrome driver setup completed successfully")
+            print("✅ Chrome driver setup completed successfully")
             return True
             
         except Exception as e:
-            print(f"Error setting up Chrome driver: {e}")
+            print(f"❌ Error setting up Chrome driver: {e}")
             return False
         
     def create_colab_notebook(self):
