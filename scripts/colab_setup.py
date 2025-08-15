@@ -73,7 +73,7 @@ class ColabAutomation:
             return True
 
     def setup_driver(self):
-        """Set up a minimal browser driver"""
+        """Set up a minimal browser driver without user data directory"""
         try:
             print(" Setting up minimal browser driver...")
             
@@ -103,7 +103,7 @@ class ColabAutomation:
                 print("❌ Could not install any browser")
                 return False
             
-            # Try to use the system's default Chrome/Chromium
+            # Try to use the system's default Chrome/Chromium with minimal options
             try:
                 from selenium.webdriver.chrome.options import Options
                 chrome_options = Options()
@@ -112,15 +112,15 @@ class ColabAutomation:
                 chrome_options.add_argument("--disable-gpu")
                 chrome_options.add_argument("--disable-extensions")
                 chrome_options.add_argument("--disable-plugins")
+                chrome_options.add_argument("--disable-background-timer-throttling")
+                chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+                chrome_options.add_argument("--disable-renderer-backgrounding")
+                chrome_options.add_argument("--disable-features=TranslateUI")
+                chrome_options.add_argument("--disable-ipc-flooding-protection")
                 
-                # Set unique user data directory
-                import tempfile
-                temp_dir = tempfile.mkdtemp(prefix="chrome-user-")
-                chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-                chrome_options.add_argument(f"--data-path={temp_dir}")
-                chrome_options.add_argument(f"--homedir={temp_dir}")
+                # NO user-data-dir argument at all
                 
-                print(f"📁 Using unique user data directory: {temp_dir}")
+                print("📁 Using default Chrome settings (no custom user data directory)")
                 
                 # Try to find ChromeDriver in system PATH
                 self.driver = webdriver.Chrome(options=chrome_options)
