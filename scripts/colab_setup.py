@@ -37,8 +37,8 @@ class ColabAutomation:
             subprocess.run(["wget", "-O", "chromedriver.zip", 
                         "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/139.0.7258.66/linux64/chromedriver-linux64.zip"], check=True)
             subprocess.run(["unzip", "chromedriver.zip"], check=True)
-            subprocess.run(["chmod", "+x", "chromedriver"], check=True)
-            subprocess.run(["sudo", "mv", "chromedriver", "/usr/local/bin/"], check=True)
+            subprocess.run(["chmod", "+x", "chromedriver-linux64/chromedriver"], check=True)
+            subprocess.run(["sudo", "mv", "chromedriver-linux64/chromedriver", "/usr/local/bin/"], check=True)
             
             # Set up Chrome options
             chrome_options = Options()
