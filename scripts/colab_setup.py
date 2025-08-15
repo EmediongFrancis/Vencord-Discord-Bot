@@ -50,7 +50,7 @@ class ColabAutomation:
             chrome_options.add_argument("--disable-extensions")
             chrome_options.add_argument("--disable-plugins")
             
-            # Create service with explicit path
+            # Create service with explicit path..
             service = Service("/usr/local/bin/chromedriver")
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             
