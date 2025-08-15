@@ -20,10 +20,62 @@ class ColabAutomation:
         self.driver = None
         self.colab_url = None
 
+    def cleanup_chrome_processes(self):
+        """Kill any existing Chrome processes"""
+        try:
+            print("🧹 Cleaning up existing Chrome processes...")
+            
+            # More aggressive cleanup
+            cleanup_commands = [
+                ["pkill", "-f", "chrome"],
+                ["pkill", "-f", "chromedriver"],
+                ["pkill", "-f", "google-chrome"],
+                ["pkill", "-f", "chromium"],
+                ["pkill", "-f", "chromium-browser"],
+                ["sudo", "pkill", "-9", "-f", "chrome"],
+                ["sudo", "pkill", "-9", "-f", "chromedriver"],
+                ["sudo", "pkill", "-9", "-f", "google-chrome"],
+                ["sudo", "pkill", "-9", "-f", "chromium"],
+                ["sudo", "pkill", "-9", "-f", "chromium-browser"]
+            ]
+            
+            for cmd in cleanup_commands:
+                try:
+                    subprocess.run(cmd, check=False)
+                except:
+                    pass
+            
+            # Remove ALL Chrome-related directories
+            cleanup_dirs = [
+                "/tmp/.com.google.Chrome*",
+                "/tmp/chrome*",
+                "/tmp/.org.chromium.Chromium*",
+                "/tmp/.config/chrome*",
+                "/tmp/.config/chromium*",
+                "/tmp/.cache/chrome*",
+                "/tmp/.cache/chromium*"
+            ]
+            
+            for dir_pattern in cleanup_dirs:
+                try:
+                    subprocess.run(["rm", "-rf"] + [dir_pattern], check=False)
+                except:
+                    pass
+            
+            # Wait longer for processes to fully terminate
+            time.sleep(5)
+            
+            print("✅ Chrome cleanup completed")
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Cleanup warning: {e}")
+            return True
+
     def setup_driver(self):
         """Set up a minimal browser driver"""
         try:
-            print("�� Setting up minimal browser driver...")
+            print(" Setting up minimal browser driver...")
             
             # Try to install a minimal browser
             subprocess.run(["sudo", "apt-get", "update"], check=True)
@@ -38,7 +90,7 @@ class ColabAutomation:
             browser_installed = False
             for browser_cmd in browsers_to_try:
                 try:
-                    print(f"�� Trying to install: {' '.join(browser_cmd)}")
+                    print(f" Trying to install: {' '.join(browser_cmd)}")
                     subprocess.run(browser_cmd, check=True)
                     browser_installed = True
                     print("✅ Browser installed successfully")
@@ -58,9 +110,17 @@ class ColabAutomation:
                 chrome_options.add_argument("--no-sandbox")
                 chrome_options.add_argument("--disable-dev-shm-usage")
                 chrome_options.add_argument("--disable-gpu")
-               # chrome_options.add_argument("--headless")
                 chrome_options.add_argument("--disable-extensions")
                 chrome_options.add_argument("--disable-plugins")
+                
+                # Set unique user data directory
+                import tempfile
+                temp_dir = tempfile.mkdtemp(prefix="chrome-user-")
+                chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+                chrome_options.add_argument(f"--data-path={temp_dir}")
+                chrome_options.add_argument(f"--homedir={temp_dir}")
+                
+                print(f"📁 Using unique user data directory: {temp_dir}")
                 
                 # Try to find ChromeDriver in system PATH
                 self.driver = webdriver.Chrome(options=chrome_options)
