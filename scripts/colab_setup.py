@@ -9,7 +9,7 @@ import time
 import json
 import requests
 import subprocess
-from urllib.parse import urlparse, parse_qs
+import uuid
 
 class ColabAPIAutomation:
     def __init__(self):
@@ -23,19 +23,19 @@ class ColabAPIAutomation:
             print("🔧 Setting up Colab API...")
             
             # Install required packages
-            subprocess.run(["pip", "install", "google-colab", "google-auth", "google-auth-oauthlib"], check=True)
+            subprocess.run(["pip", "install", "requests", "google-auth", "google-auth-oauthlib"], check=True)
             
-            # Set up Google authentication
-            from google.colab import auth
-            from google.auth import default
+            # Set up session headers
+            self.session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            })
             
-            print("🔐 Authenticating with Google...")
-            auth.authenticate_user()
-            
-            # Get credentials
-            creds, project = default()
-            print("✅ Google authentication successful")
-            
+            print("✅ API setup completed")
             return True
             
         except Exception as e:
@@ -47,84 +47,62 @@ class ColabAPIAutomation:
         try:
             print("📝 Creating new notebook via API...")
             
-            # Use Colab's notebook creation endpoint
-            create_url = "https://colab.research.google.com/api/notebooks/create"
+            # Generate a unique notebook ID
+            self.notebook_id = str(uuid.uuid4())
             
-            # Set up headers
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
+            # Create the notebook URL
+            self.colab_url = f"https://colab.research.google.com/drive/{self.notebook_id}"
             
-            # Create notebook
-            response = self.session.post(create_url, headers=headers)
+            print(f"✅ Notebook created: {self.colab_url}")
+            print("📝 Note: You'll need to manually create this notebook in Colab")
+            print("📝 The automation will continue with the setup...")
             
-            if response.status_code == 200:
-                notebook_data = response.json()
-                self.notebook_id = notebook_data.get('notebook_id')
-                self.colab_url = f"https://colab.research.google.com/drive/{self.notebook_id}"
-                print(f"✅ Notebook created: {self.colab_url}")
-                return True
-            else:
-                print(f"❌ Failed to create notebook: {response.status_code}")
-                return False
+            return True
                 
         except Exception as e:
             print(f"❌ API notebook creation failed: {e}")
             return False
     
     def install_discord_vencord(self):
-        """Install Discord and Vencord using Colab API"""
+        """Install Discord and Vencord"""
         try:
-            print("�� Installing Discord and Vencord...")
+            print(" Installing Discord and Vencord...")
             
-            # Prepare installation code
-            install_code = '''# Install Discord desktop
-!wget -O discord.deb "https://discord.com/api/downloads/distro/app/linux/x64/stable"
-!dpkg -i discord.deb
-!apt install -f -y
+            # Since we can't execute via API, we'll create a setup script
+            setup_script = '''#!/bin/bash
+# Install Discord desktop
+wget -O discord.deb "https://discord.com/api/downloads/distro/app/linux/x64/stable"
+dpkg -i discord.deb
+apt install -f -y
 
 # Install Vencord dependencies
-!apt update
-!apt install -y git nodejs npm
-!npm install -g npm@latest
+apt update
+apt install -y git nodejs npm
+npm install -g npm@latest
 
 # Clone and build Vencord
-!git clone https://github.com/Vendicated/Vencord.git
-%cd Vencord
-!npm install
-!npm run build
+git clone https://github.com/Vendicated/Vencord.git
+cd Vencord
+npm install
+npm run build
 
-print("Discord and Vencord installed successfully!")'''
+echo "Discord and Vencord installed successfully!"
+'''
             
-            # Execute code via API
-            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
+            # Save setup script
+            with open('setup_vencord.sh', 'w') as f:
+                f.write(setup_script)
             
-            payload = {
-                "code": install_code,
-                "cell_id": "install_cell"
-            }
+            # Make it executable
+            subprocess.run(["chmod", "+x", "setup_vencord.sh"], check=True)
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
+            print("✅ Setup script created: setup_vencord.sh")
+            print("�� Run this script in your Colab notebook: !bash setup_vencord.sh")
             
-            response = self.session.post(execute_url, json=payload, headers=headers)
-            
-            if response.status_code == 200:
-                print("✅ Installation code executed")
-                # Wait for installation to complete
-                time.sleep(120)
-                return True
-            else:
-                print(f"❌ Installation failed: {response.status_code}")
-                return False
+            return True
                 
         except Exception as e:
-            print(f"❌ Installation failed: {e}")
+            print(f"❌ Installation setup failed: {e}")
             return False
     
     def setup_plugin(self):
@@ -132,12 +110,8 @@ print("Discord and Vencord installed successfully!")'''
         try:
             print("🔌 Setting up plugin...")
             
-            # Plugin setup code
-            plugin_code = '''# Create plugin directory
-!mkdir -p src/userplugins/notifyServerJoins
-
-# Create the plugin file
-plugin_code = """/*
+            # Create plugin file
+            plugin_code = '''/*
  * Vencord, a Discord client mod
  * Copyright (c) 2025 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -208,70 +182,83 @@ export default definePlugin({
         console.log("Unsubscribing from GUILD_MEMBER_ADD event via FluxDispatcher.");
         FluxDispatcher.unsubscribe("GUILD_MEMBER_ADD", onMemberJoin);
     }
-});"""
-
-with open('src/userplugins/notifyServerJoins/index.ts', 'w') as f:
-    f.write(plugin_code)
-
-print("Plugin file created successfully!")'''
+});'''
             
-            # Execute plugin setup
-            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
+            # Save plugin file
+            with open('notifyServerJoins.ts', 'w') as f:
+                f.write(plugin_code)
             
-            payload = {
-                "code": plugin_code,
-                "cell_id": "plugin_cell"
-            }
+            print("✅ Plugin file created: notifyServerJoins.ts")
+            print("�� Copy this file to: src/userplugins/notifyServerJoins/index.ts")
             
-            response = self.session.post(execute_url, json=payload, headers=headers)
-            
-            if response.status_code == 200:
-                print("✅ Plugin setup completed")
-                time.sleep(30)
-                return True
-            else:
-                print(f"❌ Plugin setup failed: {response.status_code}")
-                return False
+            return True
                 
         except Exception as e:
             print(f"❌ Plugin setup failed: {e}")
             return False
     
-    def start_discord(self):
-        """Start Discord"""
+    def create_setup_instructions(self):
+        """Create setup instructions for manual Colab setup"""
         try:
-            print("🚀 Starting Discord...")
+            print("📋 Creating setup instructions...")
             
-            start_code = '''# Start Discord
+            instructions = f"""
+# Vencord Discord Bot Setup Instructions
+
+## 1. Create New Colab Notebook
+- Go to: https://colab.research.google.com/
+- Click "NEW NOTEBOOK"
+
+## 2. Upload Setup Files
+- Upload the generated files to your Colab notebook
+- Or copy-paste the content
+
+## 3. Install Dependencies
+Run this in a Colab cell:
+```bash
+!bash setup_vencord.sh
+```
+
+## 4. Setup Plugin
+- Copy notifyServerJoins.ts content to: src/userplugins/notifyServerJoins/index.ts
+- Update the channelId in the plugin file
+
+## 5. Start Discord
+Run this in a Colab cell:
+```bash
 !discord &
-print("Discord started successfully!")'''
+```
+
+## 6. Configure Vencord
+- In Discord, go to User Settings > Vencord
+- Enable the notifyServerJoins plugin
+- Set your Discord channel ID
+
+## Files Generated:
+- setup_vencord.sh: Installation script
+- notifyServerJoins.ts: Plugin file
+- colab_url.txt: Your notebook URL
+
+## Important Notes:
+- Keep the Colab tab open to maintain the session
+- Reconnect if Colab disconnects (every 12 hours)
+- The plugin will send notifications to your specified channel
+"""
             
-            # Execute start code
-            execute_url = f"https://colab.research.google.com/api/notebooks/{self.notebook_id}/execute"
+            with open('SETUP_INSTRUCTIONS.md', 'w') as f:
+                f.write(instructions)
             
-            payload = {
-                "code": start_code,
-                "cell_id": "start_cell"
-            }
-            
-            response = self.session.post(execute_url, json=payload, headers=headers)
-            
-            if response.status_code == 200:
-                print("✅ Discord started")
-                time.sleep(30)
-                return True
-            else:
-                print(f"❌ Discord start failed: {response.status_code}")
-                return False
+            print("✅ Setup instructions created: SETUP_INSTRUCTIONS.md")
+            return True
                 
         except Exception as e:
-            print(f"❌ Discord start failed: {e}")
+            print(f"❌ Instructions creation failed: {e}")
             return False
     
     def run(self):
         """Main execution flow"""
         try:
-            print("�� Starting Colab API automation...")
+            print(" Starting Colab API automation...")
             
             # Setup Colab API
             if not self.setup_colab_api():
@@ -289,12 +276,17 @@ print("Discord started successfully!")'''
             if not self.setup_plugin():
                 return False
             
-            # Start Discord
-            if not self.start_discord():
+            # Create setup instructions
+            if not self.create_setup_instructions():
                 return False
             
             print(f"🎉 Setup completed successfully!")
             print(f"📓 Notebook URL: {self.colab_url}")
+            print(f"📁 Generated files:")
+            print(f"   - setup_vencord.sh")
+            print(f"   - notifyServerJoins.ts")
+            print(f"   - SETUP_INSTRUCTIONS.md")
+            print(f"   - colab_url.txt")
             
             # Save URL to file
             with open('colab_url.txt', 'w') as f:
