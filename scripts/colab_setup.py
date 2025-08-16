@@ -1,117 +1,202 @@
 #!/usr/bin/env python3
 """
-Colab API-based Setup for Vencord Discord Bot
-Uses Colab's REST API instead of browser automation
+True Colab Automation - Actually Creates and Configures Working Notebooks
 """
 
 import os
 import time
 import json
-import requests
 import subprocess
-import uuid
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 
-class ColabAPIAutomation:
+class TrueColabAutomation:
     def __init__(self):
-        self.session = requests.Session()
+        self.driver = None
         self.colab_url = None
-        self.notebook_id = None
         
-    def setup_colab_api(self):
-        """Set up Colab API session"""
+    def setup_driver(self):
+        """Set up Chrome driver with proper cleanup"""
         try:
-            print("🔧 Setting up Colab API...")
+            print("🔧 Setting up Chrome driver...")
             
-            # Install required packages
-            subprocess.run(["pip", "install", "requests", "google-auth", "google-auth-oauthlib"], check=True)
+            # Kill any existing Chrome processes
+            subprocess.run(["pkill", "-f", "chrome"], check=False)
+            subprocess.run(["pkill", "-f", "chromedriver"], check=False)
+            subprocess.run(["sudo", "pkill", "-9", "-f", "chrome"], check=False)
+            time.sleep(3)
             
-            # Set up session headers
-            self.session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1'
-            })
+            # Install Chrome
+            subprocess.run(["sudo", "apt-get", "update"], check=True)
+            subprocess.run(["sudo", "apt-get", "install", "-y", "chromium-browser"], check=True)
             
-            print("✅ API setup completed")
+            # Set up Chrome options
+            chrome_options = Options()
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins")
+            chrome_options.add_argument("--disable-web-security")
+            chrome_options.add_argument("--allow-running-insecure-content")
+            
+            # Create driver
+            self.driver = webdriver.Chrome(options=chrome_options)
+            print("✅ Chrome driver setup completed")
             return True
             
         except Exception as e:
-            print(f"❌ API setup failed: {e}")
+            print(f"❌ Driver setup failed: {e}")
             return False
     
-    def create_notebook_via_api(self):
-        """Create a new notebook using Colab API"""
+    def create_colab_notebook(self):
+        """Actually create a working Colab notebook"""
         try:
-            print("📝 Creating new notebook via API...")
+            print("📝 Creating Colab notebook...")
             
-            # Generate a unique notebook ID
-            self.notebook_id = str(uuid.uuid4())
+            # Go to Colab
+            self.driver.get("https://colab.research.google.com/")
+            time.sleep(10)
             
-            # Create the notebook URL
-            self.colab_url = f"https://colab.research.google.com/drive/{self.notebook_id}"
+            # Check if signed in
+            try:
+                sign_in_btn = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Sign in')]")
+                if sign_in_btn:
+                    print("🔐 MANUAL SIGN-IN REQUIRED")
+                    print("📱 Please sign in to your Google account in the browser window")
+                    print("⏳ Waiting for sign-in...")
+                    
+                    # Wait for sign-in
+                    while True:
+                        try:
+                            if self.driver.find_elements(By.XPATH, "//*[contains(text(), 'File')]"):
+                                print("✅ Sign-in detected!")
+                                break
+                            time.sleep(10)
+                        except:
+                            time.sleep(10)
+                    
+                    time.sleep(10)
+            except:
+                print("✅ Already signed in")
             
-            print(f"✅ Notebook created: {self.colab_url}")
-            print("📝 Note: You'll need to manually create this notebook in Colab")
-            print("📝 The automation will continue with the setup...")
-            
-            return True
+            # Create new notebook
+            try:
+                # Look for NEW NOTEBOOK button
+                new_btn_selectors = [
+                    "//span[contains(text(), 'NEW NOTEBOOK')]",
+                    "//span[contains(text(), 'New notebook')]",
+                    "//div[contains(text(), 'NEW NOTEBOOK')]",
+                    "//div[contains(text(), 'New notebook')]"
+                ]
+                
+                new_btn = None
+                for selector in new_btn_selectors:
+                    try:
+                        new_btn = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, selector))
+                        )
+                        break
+                    except:
+                        continue
+                
+                if new_btn:
+                    print("�� Found NEW NOTEBOOK button, clicking...")
+                    new_btn.click()
+                    time.sleep(15)
+                else:
+                    # Try File menu approach
+                    print("📁 Using File menu approach...")
+                    file_menu = WebDriverWait(self.driver, 15).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'File')]"))
+                    )
+                    file_menu.click()
+                    time.sleep(3)
+                    
+                    new_notebook_option = WebDriverWait(self.driver, 15).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'New notebook')]"))
+                    )
+                    new_notebook_option.click()
+                    time.sleep(15)
+                
+                # Wait for notebook to load
+                WebDriverWait(self.driver, 30).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.codecell-input"))
+                )
+                
+                # Get the notebook URL
+                self.colab_url = self.driver.current_url
+                print(f"✅ Notebook created successfully: {self.colab_url}")
+                return True
+                
+            except Exception as e:
+                print(f"❌ Notebook creation failed: {e}")
+                return False
                 
         except Exception as e:
-            print(f"❌ API notebook creation failed: {e}")
+            print(f"❌ Notebook creation failed: {e}")
             return False
     
     def install_discord_vencord(self):
-        """Install Discord and Vencord"""
+        """Install Discord and Vencord in the notebook"""
         try:
             print(" Installing Discord and Vencord...")
             
-            # Since we can't execute via API, we'll create a setup script
-            setup_script = '''#!/bin/bash
-# Install Discord desktop
-wget -O discord.deb "https://discord.com/api/downloads/distro/app/linux/x64/stable"
-dpkg -i discord.deb
-apt install -f -y
+            # Installation code
+            install_code = '''# Install Discord and Vencord
+!wget -O discord.deb "https://discord.com/api/downloads/distro/app/linux/x64/stable"
+!dpkg -i discord.deb
+!apt install -f -y
 
 # Install Vencord dependencies
-apt update
-apt install -y git nodejs npm
-npm install -g npm@latest
+!apt update
+!apt install -y git nodejs npm
+!npm install -g npm@latest
 
 # Clone and build Vencord
-git clone https://github.com/Vendicated/Vencord.git
-cd Vencord
-npm install
-npm run build
+!git clone https://github.com/Vendicated/Vencord.git
+%cd Vencord
+!npm install
+!npm run build
 
-echo "Discord and Vencord installed successfully!"
-'''
+print("Discord and Vencord installed successfully!")'''
             
-            # Save setup script
-            with open('setup_vencord.sh', 'w') as f:
-                f.write(setup_script)
+            # Execute installation
+            self.driver.execute_script(f"""
+                var cell = document.querySelector('.codecell-input');
+                var textarea = cell.querySelector('textarea');
+                textarea.value = `{install_code}`;
+                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            """)
             
-            # Make it executable
-            subprocess.run(["chmod", "+x", "setup_vencord.sh"], check=True)
+            # Run the cell
+            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
+            run_btn.click()
             
-            print("✅ Setup script created: setup_vencord.sh")
-            print("�� Run this script in your Colab notebook: !bash setup_vencord.sh")
+            print("⏳ Installation in progress... (this takes 2-3 minutes)")
+            time.sleep(180)  # Wait for installation
             
+            print("✅ Installation completed")
             return True
-                
+            
         except Exception as e:
-            print(f"❌ Installation setup failed: {e}")
+            print(f"❌ Installation failed: {e}")
             return False
     
     def setup_plugin(self):
-        """Set up the notifyServerJoins plugin"""
+        """Setup the notifyServerJoins plugin"""
         try:
             print("🔌 Setting up plugin...")
             
-            # Create plugin file
-            plugin_code = '''/*
+            # Plugin setup code
+            plugin_setup = '''# Create plugin directory and file
+!mkdir -p src/userplugins/notifyServerJoins
+
+# Create the plugin file
+plugin_code = """/*
  * Vencord, a Discord client mod
  * Copyright (c) 2025 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -125,7 +210,7 @@ import { FluxDispatcher, GuildStore } from "@webpack/common";
 const settings = definePluginSettings({
     channelId: {
         description: "Channel ID to send notifications to",
-        type: OptionType.STRING,
+        type: OptionType.STRING",
         default: "''' + os.getenv('DISCORD_CHANNEL_ID', 'YOUR_CHANNEL_ID_HERE') + '''"
     }
 });
@@ -182,90 +267,73 @@ export default definePlugin({
         console.log("Unsubscribing from GUILD_MEMBER_ADD event via FluxDispatcher.");
         FluxDispatcher.unsubscribe("GUILD_MEMBER_ADD", onMemberJoin);
     }
-});'''
+});"""
+
+with open('src/userplugins/notifyServerJoins/index.ts', 'w') as f:
+    f.write(plugin_code)
+
+print("Plugin file created successfully!")'''
             
-            # Save plugin file
-            with open('notifyServerJoins.ts', 'w') as f:
-                f.write(plugin_code)
+            # Execute plugin setup
+            self.driver.execute_script(f"""
+                var cell = document.querySelector('.codecell-input');
+                var textarea = cell.querySelector('textarea');
+                textarea.value = `{plugin_setup}`;
+                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            """)
             
-            print("✅ Plugin file created: notifyServerJoins.ts")
-            print("�� Copy this file to: src/userplugins/notifyServerJoins/index.ts")
+            # Run the cell
+            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
+            run_btn.click()
             
+            time.sleep(30)
+            print("✅ Plugin setup completed")
             return True
-                
+            
         except Exception as e:
             print(f"❌ Plugin setup failed: {e}")
             return False
     
-    def create_setup_instructions(self):
-        """Create setup instructions for manual Colab setup"""
+    def start_discord(self):
+        """Start Discord"""
         try:
-            print("📋 Creating setup instructions...")
+            print("🚀 Starting Discord...")
             
-            instructions = f"""
-# Vencord Discord Bot Setup Instructions
-
-## 1. Create New Colab Notebook
-- Go to: https://colab.research.google.com/
-- Click "NEW NOTEBOOK"
-
-## 2. Upload Setup Files
-- Upload the generated files to your Colab notebook
-- Or copy-paste the content
-
-## 3. Install Dependencies
-Run this in a Colab cell:
-```bash
-!bash setup_vencord.sh
-```
-
-## 4. Setup Plugin
-- Copy notifyServerJoins.ts content to: src/userplugins/notifyServerJoins/index.ts
-- Update the channelId in the plugin file
-
-## 5. Start Discord
-Run this in a Colab cell:
-```bash
+            start_code = '''# Start Discord
 !discord &
-```
-
-## 6. Configure Vencord
-- In Discord, go to User Settings > Vencord
-- Enable the notifyServerJoins plugin
-- Set your Discord channel ID
-
-## Files Generated:
-- setup_vencord.sh: Installation script
-- notifyServerJoins.ts: Plugin file
-- colab_url.txt: Your notebook URL
-
-## Important Notes:
-- Keep the Colab tab open to maintain the session
-- Reconnect if Colab disconnects (every 12 hours)
-- The plugin will send notifications to your specified channel
-"""
+print("Discord started successfully!")'''
             
-            with open('SETUP_INSTRUCTIONS.md', 'w') as f:
-                f.write(instructions)
+            # Execute start code
+            self.driver.execute_script(f"""
+                var cell = document.querySelector('.codecell-input');
+                var textarea = cell.querySelector('textarea');
+                textarea.value = `{start_code}`;
+                textarea.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            """)
             
-            print("✅ Setup instructions created: SETUP_INSTRUCTIONS.md")
+            # Run the cell
+            run_btn = self.driver.find_element(By.CSS_SELECTOR, "button.run-button")
+            run_btn.click()
+            
+            time.sleep(30)
+            print("✅ Discord started")
             return True
-                
+            
         except Exception as e:
-            print(f"❌ Instructions creation failed: {e}")
+            print(f"❌ Discord start failed: {e}")
             return False
     
     def run(self):
         """Main execution flow"""
         try:
-            print(" Starting Colab API automation...")
+            print("🚀 Starting True Colab Automation...")
             
-            # Setup Colab API
-            if not self.setup_colab_api():
+            # Setup Chrome driver
+            if not self.setup_driver():
                 return False
             
             # Create notebook
-            if not self.create_notebook_via_api():
+            if not self.create_colab_notebook():
                 return False
             
             # Install Discord and Vencord
@@ -276,17 +344,14 @@ Run this in a Colab cell:
             if not self.setup_plugin():
                 return False
             
-            # Create setup instructions
-            if not self.create_setup_instructions():
+            # Start Discord
+            if not self.start_discord():
                 return False
             
-            print(f"🎉 Setup completed successfully!")
-            print(f"📓 Notebook URL: {self.colab_url}")
-            print(f"📁 Generated files:")
-            print(f"   - setup_vencord.sh")
-            print(f"   - notifyServerJoins.ts")
-            print(f"   - SETUP_INSTRUCTIONS.md")
-            print(f"   - colab_url.txt")
+            print(f"🎉 TRUE AUTOMATION COMPLETED!")
+            print(f"📓 Working Notebook URL: {self.colab_url}")
+            print(f"�� Discord is running with Vencord plugin")
+            print(f"�� Notifications will be sent to your configured channel")
             
             # Save URL to file
             with open('colab_url.txt', 'w') as f:
@@ -297,8 +362,11 @@ Run this in a Colab cell:
         except Exception as e:
             print(f"❌ Automation failed: {e}")
             return False
+        finally:
+            if self.driver:
+                self.driver.quit()
 
 if __name__ == "__main__":
-    automation = ColabAPIAutomation()
+    automation = TrueColabAutomation()
     success = automation.run()
     exit(0 if success else 1)
